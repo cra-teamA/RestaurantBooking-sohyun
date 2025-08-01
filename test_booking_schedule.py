@@ -9,9 +9,7 @@ from booking_scheduler import BookingScheduler
 from datetime import datetime, timedelta
 
 NOT_ON_THE_HOUR = datetime.strptime("2025/08/01 12:36", "%Y/%m/%d %H:%M")
-CUSTOMER = Customer("so", "010-1234-5678")
 ON_THE_HOUR = datetime.strptime("2025/08/01 12:00", "%Y/%m/%d %H:%M")
-CUSTOMER_WITH_MAIL = Customer("so", "010-1234-5678", "so@so.com")
 
 SUNDAY_DATE = "2025/08/03 14:00"
 FRIDAY_DATE = "2025/08/01 14:00"
@@ -29,12 +27,26 @@ class TestableBookingScheduler(BookingScheduler):
         return datetime.strptime(self._date_time, "%Y/%m/%d %H:%M")
 
 
-@pytest.fixture()
+@pytest.fixture
+def customer(mocker):
+    customer = mocker.Mock()
+    customer.get_email.return_value = None
+    return customer
+
+
+@pytest.fixture
+def customer_with_mail(mocker):
+    customer = mocker.Mock()
+    customer.get_email.return_value = "so@so.com"
+    return customer
+
+
+@pytest.fixture
 def booking_scheduler():
     return BookingScheduler(CAPACITY_PER_HOUR)
 
 
-@pytest.fixture()
+@pytest.fixture
 def booking_scheduler_with_sms_mock():
     booking_scheduler = BookingScheduler(CAPACITY_PER_HOUR)
     testable_sms_sender = TestableSmsSender()
@@ -50,81 +62,81 @@ def booking_scheduler_with_email_mock():
     return booking_scheduler, testable_mail_sender
 
 
-def test_예약은_정시에만_가능하다_정시가_아닌경우_예약불가(booking_scheduler):
-    schedule = Schedule(NOT_ON_THE_HOUR, UNDER_CAPACITY, CUSTOMER)
+def test_예약은_정시에만_가능하다_정시가_아닌경우_예약불가(booking_scheduler, customer):
+    schedule = Schedule(NOT_ON_THE_HOUR, UNDER_CAPACITY, customer)
 
     with pytest.raises(ValueError):
         booking_scheduler.add_schedule(schedule)
 
 
-def test_예약은_정시에만_가능하다_정시인_경우_예약가능(booking_scheduler):
-    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, CUSTOMER)
+def test_예약은_정시에만_가능하다_정시인_경우_예약가능(booking_scheduler, customer):
+    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, customer)
 
     booking_scheduler.add_schedule(schedule)
 
     assert booking_scheduler.has_schedule(schedule)
 
 
-def test_시간대별_인원제한이_있다_같은_시간대에_Capacity_초과할_경우_예외발생(booking_scheduler):
-    schedule = Schedule(ON_THE_HOUR, CAPACITY_PER_HOUR, CUSTOMER)
+def test_시간대별_인원제한이_있다_같은_시간대에_Capacity_초과할_경우_예외발생(booking_scheduler, customer):
+    schedule = Schedule(ON_THE_HOUR, CAPACITY_PER_HOUR, customer)
 
     booking_scheduler.add_schedule(schedule)
 
     with pytest.raises(ValueError, match="Number of people is over restaurant capacity per hour"):
-        new_schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, CUSTOMER)
+        new_schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, customer)
         booking_scheduler.add_schedule(new_schedule)
 
 
-def test_시간대별_인원제한이_있다_같은_시간대가_다르면_Capacity_차있어도_스케쥴_추가_성공(booking_scheduler):
-    schedule = Schedule(ON_THE_HOUR, CAPACITY_PER_HOUR, CUSTOMER)
+def test_시간대별_인원제한이_있다_같은_시간대가_다르면_Capacity_차있어도_스케쥴_추가_성공(booking_scheduler, customer):
+    schedule = Schedule(ON_THE_HOUR, CAPACITY_PER_HOUR, customer)
     booking_scheduler.add_schedule(schedule)
 
     diffrent_hour = ON_THE_HOUR + timedelta(hours=1)
-    new_schedule = Schedule(diffrent_hour, UNDER_CAPACITY, CUSTOMER)
+    new_schedule = Schedule(diffrent_hour, UNDER_CAPACITY, customer)
     booking_scheduler.add_schedule(new_schedule)
 
     assert booking_scheduler.has_schedule(schedule)
     assert booking_scheduler.has_schedule(new_schedule)
 
 
-def test_예약완료시_SMS는_무조건_발송(booking_scheduler_with_sms_mock):
+def test_예약완료시_SMS는_무조건_발송(booking_scheduler_with_sms_mock, customer):
     booking_scheduler, sms_mock = booking_scheduler_with_sms_mock
-    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, CUSTOMER)
+    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, customer)
 
     booking_scheduler.add_schedule(schedule)
 
     assert sms_mock.send_called
 
 
-def test_이메일이_없는_경우에는_이메일_미발송(booking_scheduler_with_email_mock):
+def test_이메일이_없는_경우에는_이메일_미발송(booking_scheduler_with_email_mock, customer):
     booking_scheduler, mail_mock = booking_scheduler_with_email_mock
-    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, CUSTOMER)
+    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, customer)
 
     booking_scheduler.add_schedule(schedule)
 
     assert mail_mock.send_mail_called == 0
 
 
-def test_이메일이_있는_경우에는_이메일_발송(booking_scheduler_with_email_mock):
+def test_이메일이_있는_경우에는_이메일_발송(booking_scheduler_with_email_mock, customer_with_mail):
     booking_scheduler, mail_mock = booking_scheduler_with_email_mock
-    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, CUSTOMER_WITH_MAIL)
+    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, customer_with_mail)
 
     booking_scheduler.add_schedule(schedule)
 
     assert mail_mock.send_mail_called == 1
 
 
-def test_현재날짜가_일요일인_경우_예약불가_예외처리():
+def test_현재날짜가_일요일인_경우_예약불가_예외처리(customer):
     booking_scheduler = TestableBookingScheduler(CAPACITY_PER_HOUR, SUNDAY_DATE)
-    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, CUSTOMER)
+    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, customer)
 
     with pytest.raises(ValueError):
         booking_scheduler.add_schedule(schedule)
 
 
-def test_현재날짜가_일요일이_아닌경우_예약가능():
+def test_현재날짜가_일요일이_아닌경우_예약가능(customer):
     booking_scheduler = TestableBookingScheduler(CAPACITY_PER_HOUR, FRIDAY_DATE)
-    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, CUSTOMER)
+    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, customer)
 
     booking_scheduler.add_schedule(schedule)
 
