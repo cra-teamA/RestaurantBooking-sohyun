@@ -15,7 +15,14 @@ def test_예약은_정시에만_가능하다_정시가_아닌경우_예약불가
         booking_scheduler.add_schedule(schedule)
 
 def test_예약은_정시에만_가능하다_정시인_경우_예약가능():
-    pass
+    not_on_the_hour = datetime.strptime("2025/08/01 12:00", "%Y/%m/%d %H:%M")
+    customer = Customer("so", "010-1234-5678")
+    schedule = Schedule(not_on_the_hour, 1, customer)
+    booking_scheduler = BookingScheduler(3)
+
+    booking_scheduler.add_schedule(schedule)
+
+    assert booking_scheduler.has_schedule(schedule)
 
 def test_시간대별_인원제한이_있다_같은_시간대에_Capacity_초과할_경우_예외발생():
     pass
