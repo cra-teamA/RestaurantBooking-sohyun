@@ -3,9 +3,16 @@ import pytest
 from schedule import Customer, Schedule
 from communication import SmsSender, MailSender
 from booking_scheduler import BookingScheduler
+from datetime import datetime
 
 def test_예약은_정시에만_가능하다_정시가_아닌경우_예약불가():
-    pass
+    not_on_the_hour = datetime.strptime("2025/08/01 12:36", "%Y/%m/%d %H:%M")
+    customer = Customer("so", "010-1234-5678")
+    schedule = Schedule(not_on_the_hour, 1, customer)
+    booking_scheduler = BookingScheduler(3)
+
+    with pytest.raises(ValueError):
+        booking_scheduler.add_schedule(schedule)
 
 def test_예약은_정시에만_가능하다_정시인_경우_예약가능():
     pass
