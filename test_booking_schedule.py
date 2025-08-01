@@ -1,6 +1,7 @@
 import pytest
 
 from schedule import Customer, Schedule
+from test_communication import TestableSmsSender
 
 UNDER_CAPACITY = 1
 from communication import SmsSender, MailSender
@@ -56,8 +57,15 @@ def test_시간대별_인원제한이_있다_같은_시간대가_다르면_Capac
     assert booking_scheduler.has_schedule(schedule)
     assert booking_scheduler.has_schedule(new_schedule)
 
-def test_예약완료시_SMS는_무조건_발송():
-    pass
+
+def test_예약완료시_SMS는_무조건_발송(booking_scheduler):
+    testable_sms_sender = TestableSmsSender()
+    booking_scheduler.set_sms_sender(testable_sms_sender)
+    schedule = Schedule(ON_THE_HOUR, UNDER_CAPACITY, CUSTOMER)
+
+    booking_scheduler.add_schedule(schedule)
+
+    assert testable_sms_sender.send_called
 
 
 def test_이메일이_없는_경우에는_이메일_미발송():
